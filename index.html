@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oca de Preguntas</title>
+<style>
+
+:root {
+  --pitch-dark: #1b4332;
+  --pitch:      #2d6a4f;
+  --pitch-light:#40916c;
+  --line:       #f1faee;
+  --gold:       #ffb703;
+  --wrong:      #e63946;
+  --right:      #52b788;
+  --ink:        #081c15;
+  --card:       #fbfbf6;
+  --shadow:     0 6px 18px rgba(0,0,0,.25);
+  --sidebar-w:  300px;
+  --header-h:   52px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: Arial, "Helvetica Neue", sans-serif;
+  background: radial-gradient(ellipse at top, var(--pitch-light), var(--pitch-dark) 70%);
+  color: var(--line);
+}
+
+h1, h2, h3 {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  border-radius: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+/* ───── TITLE BAR ───── */
+.title-bar {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,.25);
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  flex-shrink: 0;
+}
+.title-bar h1 {
+  font-size: clamp(16px, 2.4vw, 28px);
+  font-weight: 900;
+  color: var(--line);
+  text-shadow: 0 2px 0 rgba(0,0,0,.35);
+}
+
+/* ───── SETUP ───── */
+#setup {
+  height: calc(100vh - var(--header-h));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.setup-card {
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 400px;
+}
+.setup-grid { display: grid; gap: 14px; }
+.field label {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 6px;
+  color: var(--pitch-dark);
+}
+select, input[type=text] {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 2px solid #d8d8d0;
+  font-size: 15px;
+  background: #fff;
+  font-family: inherit;
+}
+.player-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.swatch {
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.2);
+}
+.btn-primary {
+  background: var(--gold);
+  color: #3a2900;
+  padding: 14px 20px;
+  font-size: 16px;
+  width: 100%;
+  box-shadow: 0 4px 0 #c98d02;
+  transition: transform .05s;
+}
+.btn-primary:active { transform: translateY(3px); box-shadow: 0 1px 0 #c98d02; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+
+/* ───── GAME LAYOUT ───── */
+#gameWrap {
+  display: none;
+  height: calc(100vh - var(--header-h));
+}
+.game-layout {
+  display: grid;
+  grid-template-columns: 1fr var(--sidebar-w);
+  height: 100%;
+}
+
+/* ───── BOARD COLUMN ───── */
+.board-column {
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+}
+.board-outer {
+  container-type: size;
+  /* Always square, fitting whichever dimension is smaller */
+  width: min(100cqw - 32px, 100cqh - 32px);
+  aspect-ratio: 1 / 1;
+  background: var(--pitch-dark);
+  border: 5px solid var(--line);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+}
+.cell {
+  position: relative;
+  background: var(--pitch);
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(7px, 1.8cqw, 13px);
+  font-weight: 800;
+  color: rgba(255,255,255,.85);
+  border: 1px solid rgba(255,255,255,.08);
+  overflow: hidden;
+}
+.cell.special {
+  box-shadow: inset 0 0 0 2px var(--cat-color, var(--gold));
+  background: linear-gradient(160deg, var(--pitch) 60%, rgba(255,255,255,.06));
+}
+.cell.special::after {
+  content: "?";
+  font-size: clamp(9px, 2.2cqw, 17px);
+  color: var(--cat-color, var(--gold));
+}
+.cell.start  { background: var(--right); color: #062; }
+.cell.goal   { background: var(--gold);  color: #3a2900; }
+.cell .num {
+  position: absolute;
+  top: 2px; left: 3px;
+  font-size: clamp(5px, 1.2cqw, 9px);
+  opacity: .6;
+}
+.tokens {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+  position: absolute;
+  bottom: 2px;
+}
+.token {
+  width: clamp(8px, 2cqw, 14px);
+  height: clamp(8px, 2cqw, 14px);
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.5);
+}
+
+/* ───── SIDEBAR ───── */
+.sidebar {
+  background: rgba(0,0,0,.3);
+  border-left: 1px solid rgba(255,255,255,.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sb-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  flex-shrink: 0;
+}
+.sb-log {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+}
+.section-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  opacity: .5;
+  margin-bottom: 8px;
+}
+
+/* Player chips */
+.player-chip {
+  background: rgba(255,255,255,.07);
+  border-radius: 8px;
+  padding: 7px 10px;
+  border: 2px solid transparent;
+  margin-bottom: 5px;
+}
+.player-chip:last-child { margin-bottom: 0; }
+.player-chip.active {
+  border-color: var(--gold);
+  background: rgba(255,183,3,.15);
+}
+.player-chip .pname {
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.player-chip .ppos { opacity: .7; font-size: 12px; margin-top: 2px; }
+.player-chip .pending-tag {
+  display: inline-block;
+  margin-top: 3px;
+  background: var(--wrong);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+/* Dice */
+.dice-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.dice {
+  width: 80px; height: 80px;
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  font-weight: 900;
+  box-shadow: var(--shadow);
+}
+.roll-btn {
+  background: var(--gold);
+  color: #3a2900;
+  padding: 12px 18px;
+  font-size: 14px;
+  width: 100%;
+  box-shadow: 0 4px 0 #c98d02;
+}
+.roll-btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.roll-btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #c98d02; }
+
+/* Legend */
+#legend { display: flex; flex-direction: column; gap: 7px; font-size: 13px; }
+#legend span { display: flex; align-items: center; gap: 8px; }
+#legend i {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+/* Log */
+.log {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  font-size: 12px;
+}
+.log div { margin-bottom: 5px; opacity: .9; line-height: 1.4; }
+
+/* ───── MODAL ───── */
+.overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+.modal {
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 740px;
+  width: 100%;
+  box-shadow: var(--shadow);
+}
+.modal .cat-tag {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 20px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+.modal h3 {
+  color: var(--ink);
+  font-size: 22px;
+  margin-bottom: 20px;
+  line-height: 1.35;
+  text-transform: none;
+}
+.option-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 2px solid #d8d8d0;
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.option-btn:hover:not(:disabled) { border-color: var(--pitch); }
+.option-btn.correct { background: var(--right); color: #fff; border-color: var(--right); }
+.option-btn.wrong   { background: var(--wrong); color: #fff; border-color: var(--wrong); }
+.option-btn:disabled { cursor: default; }
+.modal .feedback { margin-top: 8px; font-weight: 800; font-size: 15px; }
+.modal .continue-btn {
+  margin-top: 16px;
+  background: var(--pitch-dark);
+  color: #fff;
+  padding: 13px 20px;
+  width: 100%;
+  display: none;
+}
+.winner-modal h2 { color: var(--ink); font-size: 26px; margin-bottom: 14px; }
+
+</style>
+</head>
+<body>
+
+<header class="title-bar">
+  <h1>👩‍🔬 Carrera por el Laboratorio 👨‍🔬</h1>
+</header>
+
+<!-- ================= SETUP ================= -->
+<div id="setup">
+  <div class="setup-card">
+    <div class="setup-grid">
+      <div class="field">
+        <label for="numPlayers">Cantidad de jugadores</label>
+        <select id="numPlayers">
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+      <div id="playerNames"></div>
+      <button class="btn-primary" id="startBtn">Empezar partida</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= GAME ================= -->
+<div id="gameWrap">
+  <div class="game-layout">
+
+    <!-- Board -->
+    <div class="board-column">
+      <div class="board-outer">
+        <div class="board" id="board"></div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+
+      <div class="sb-section">
+        <div class="section-label">Jugadores</div>
+        <div id="hud"></div>
+      </div>
+
+      <div class="sb-section">
+        <div class="section-label">Dado</div>
+        <div class="dice-area">
+          <div class="dice" id="diceFace">🎲</div>
+          <button class="roll-btn" id="rollBtn">Tirar el dado</button>
+        </div>
+      </div>
+
+      <div class="sb-section">
+        <div class="section-label">Categorías</div>
+        <div id="legend"></div>
+      </div>
+
+      <div class="sb-log">
+        <div class="section-label">Registro</div>
+        <div class="log" id="log"></div>
+      </div>
+
+    </aside>
+  </div>
+</div>
+
+<!-- ================= QUESTION MODAL ================= -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modalBox">
+    <div class="cat-tag" id="catTag"></div>
+    <h3 id="questionText"></h3>
+    <div id="options"></div>
+    <div class="feedback" id="feedback"></div>
+    <button class="continue-btn" id="continueBtn">Continuar</button>
+  </div>
+</div>
+
+<!-- ================= WINNER MODAL ================= -->
+<div class="overlay" id="winOverlay">
+  <div class="modal winner-modal">
+    <h2 id="winnerText">¡Ganó!</h2>
+    <button class="btn-primary" onclick="location.reload()">Jugar de nuevo</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   BANCO DE PREGUNTAS
+   -------------------------------------------------------------------------
+   Reemplazá este objeto por tus propias preguntas. Reglas:
+   - 4 categorías (podés renombrarlas en "name").
+   - Exactamente 7 preguntas por categoría.
+   - Cada pregunta tiene 3 "options" y "correct" es el índice (0,1,2)
+     de la opción correcta.
+   - "color" define el color de identificación de la categoría en el
+     tablero y en el modal (usar un color hex).
+
+   CARGA DESDE ARCHIVO EXTERNO (opcional):
+   Si este HTML se sirve desde un servidor (http/https, no file://) y
+   existe un archivo "preguntas.json" al lado, la app intenta cargarlo
+   automáticamente y reemplaza este banco por el del archivo. El JSON debe
+   tener exactamente esta misma forma (ver más abajo, tryLoadExternal()).
+   Si falla (por ejemplo al abrir el archivo directamente en el navegador,
+   o en Genially), se usa este banco embebido sin ningún error visible.
+   ========================================================================= */
+let QUESTION_BANK = {
+  categories: [
+    {
+      name: "Sistemas Materiales",
+      color: "#ffb703",
+      questions: [
+        { question: "Un sistema formado por agua y aceite es:", options: ["Homogéneo", "Heterogéneo, 2 fases", "Heterogéneo, 3 fases"], correct: 1 },
+        { question: "El agua con sal disuelta es un sistema:", options: ["Homogeneo", "Heterogeneo, 2 fases", "Heterogeneo, 3 fases"], correct: 0 },
+        { question: "'Fase' se define como:", options: ["El liquido del sistema", "El recipiente que contiene la mezcla", "Porción de materia con propiedades uniformes"], correct: 2 },
+        { question: "Un sistema con agua, hielo y aceite tiene:", options: ["1 fase", "2 fases", "3 fases"], correct: 2 },
+        { question: "Los 'componentes' de un sistema son:",options: ["Solo los solidos", "Las sustancias que los forman", "Solo los liquidos"], correct: 1 },
+      ]
+    },
+    {
+      name: " Métodos de Separación ",
+      color: "#4cc9f0",
+      questions: [
+        { question: "Para separar arena de agua usas", options: ["Imantacion", "Filtracion", "Tamizacion"], correct: 1 },
+        { question: "Para separar limaduras de hierro y arena usas", options: ["Tamizacion", "Filtracion", "Imantacion"], correct: 2 },
+        { question: "Para separar aceite y agua usas", options: ["Decantacion", "Filtracion", "Tamizacion"], correct: 0 },
+        { question: "La Tamizacion separa solidos segun su", options: ["Color", "Tamaño", "Punto de ebullicion"], correct: 1 },
+      ]
+    },
+    {
+      name: "Soluciones",
+      color: "#f72585",
+      questions: [
+        { question: "En agua con azúcar disuelta, el soluto es", options: ["Azucar", "Agua", "Ninguno"], correct: 0 },
+        { question: "El agua se llama 'solvente universal' porque:", options: ["Es incolora", "Es inolora", "Disuelve la mayor cantidad de sustancias"], correct: 2 },
+        { question: "En la atmósfera el solvente es: ", options: ["Oxigeno", "Nitrogeno", "Dioxido de carbono"], correct: 1 },
+        { question: "El solvente es:", options: ["La sustancia que disuelve", "La sustancia disuelta", "El solido de la solucion"], correct: 0 },
+      ]
+    },
+    {
+      name: "Métodos de Fraccionamiento",
+      color: "#7bdff2",
+      questions: [
+        { question: "Para separar agua en sal disuelta se usa", options: ["Destilacion", "Cromatografia", "Tamizacion"], correct: 0 },
+        { question: "La Cristalizacion separa el soluto mediante:", options: ["Evaporación lenta del solvente hasta formar cristales", "Un iman", "Ebullicion rapida"], correct: 0 },
+        { question: "La Cromatografia permite", options: ["Separar liquidos", "Separar solidos por tamaño", "Separar componentes de una mezcla según su distinta velocidad de desplazamiento"], correct: 2 },
+        { question: "La Destilación se basa en diferencias de:", options: ["Punto de ebullicion", "Color", "Tamaño"], correct: 0 },
+        { question: "Un ejemplo de Cromatografia cotidiano es:", options: ["Separar la tinta de una flor con una servilleta en agua", "Colar el cafe", "Usar un iman"], correct: 1 },
+      ]
+    }
+  ]
+};
+
+async function tryLoadExternal(){
+  try{
+    const res = await fetch("preguntas.json", {cache:"no-store"});
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data && Array.isArray(data.categories) && data.categories.length === 4){
+      QUESTION_BANK = data;
+    }
+  }catch(e){
+    // Sin conexión a archivo externo: se usa el banco embebido.
+  }
+}
+
+/* =========================================================================
+   CONFIGURACIÓN DEL TABLERO
+   ========================================================================= */
+const TOTAL_CELLS  = 64;
+const SPECIAL_STEP = 4;
+const SPECIAL_START = 2;
+
+const PLAYER_COLORS = ["#e63946", "#4361ee", "#ffb703", "#2d6a4f"];
+
+let players = [];
+let currentPlayerIdx = 0;
+let cellCategoryMap = {};
+let usedQuestions = {};
+let gameOver = false;
+
+function buildSpecialCells(){
+  cellCategoryMap = {};
+  let catCycle = 0;
+  for(let c = SPECIAL_START; c < TOTAL_CELLS; c += SPECIAL_STEP){
+    cellCategoryMap[c] = catCycle % QUESTION_BANK.categories.length;
+    catCycle++;
+  }
+  usedQuestions = {0:new Set(),1:new Set(),2:new Set(),3:new Set()};
+}
+
+function pickQuestion(catIdx){
+  const qs = QUESTION_BANK.categories[catIdx].questions;
+  const used = usedQuestions[catIdx];
+  let available = qs.map((q,i)=>i).filter(i=>!used.has(i));
+  if(available.length === 0){
+    used.clear();
+    available = qs.map((q,i)=>i);
+  }
+  const idx = available[Math.floor(Math.random()*available.length)];
+  used.add(idx);
+  return {qIndex: idx, data: qs[idx]};
+}
+
+/* =========================================================================
+   SETUP UI
+   ========================================================================= */
+const numPlayersSel  = document.getElementById("numPlayers");
+const playerNamesDiv = document.getElementById("playerNames");
+
+function renderPlayerNameInputs(){
+  const n = parseInt(numPlayersSel.value);
+  playerNamesDiv.innerHTML = "";
+  for(let i=0;i<n;i++){
+    const row = document.createElement("div");
+    row.className = "player-name-row";
+    row.innerHTML = `
+      <span class="swatch" style="width:22px;height:22px;background:${PLAYER_COLORS[i]}"></span>
+      <input type="text" id="pname${i}" placeholder="Jugador ${i+1}" value="Jugador ${i+1}">
+    `;
+    playerNamesDiv.appendChild(row);
+  }
+}
+numPlayersSel.addEventListener("change", renderPlayerNameInputs);
+renderPlayerNameInputs();
+
+document.getElementById("startBtn").addEventListener("click", async ()=>{
+  await tryLoadExternal();
+  const n = parseInt(numPlayersSel.value);
+  players = [];
+  for(let i=0;i<n;i++){
+    const nameInput = document.getElementById(`pname${i}`);
+    players.push({
+      name: (nameInput.value || `Jugador ${i+1}`).trim(),
+      color: PLAYER_COLORS[i],
+      pos: 0,
+      pending: null
+    });
+  }
+  buildSpecialCells();
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("gameWrap").style.display = "block";
+  buildBoard();
+  buildLegend();
+  renderAll();
+  addLog("Empieza el juego. ¡Suerte a todos!");
+});
+
+/* =========================================================================
+   TABLERO
+   ========================================================================= */
+const boardEl = document.getElementById("board");
+
+function cellRowCol(n){
+  const i = n - 1;
+  const row = Math.floor(i/8);
+  const posInRow = i % 8;
+  const col = (row % 2 === 0) ? posInRow : (7 - posInRow);
+  return {row: row+1, col: col+1};
+}
+
+function buildBoard(){
+  boardEl.innerHTML = "";
+  for(let n=1;n<=TOTAL_CELLS;n++){
+    const {row,col} = cellRowCol(n);
+    const div = document.createElement("div");
+    div.className = "cell";
+    div.style.gridRowStart = row;
+    div.style.gridColumnStart = col;
+    div.dataset.cell = n;
+
+    if(n === 1) div.classList.add("start");
+    else if(n === TOTAL_CELLS) div.classList.add("goal");
+    else if(cellCategoryMap[n] !== undefined){
+      div.classList.add("special");
+      div.style.setProperty("--cat-color", QUESTION_BANK.categories[cellCategoryMap[n]].color);
+    }
+
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = n;
+    div.appendChild(num);
+
+    if(n===1){ const l=document.createElement("span"); l.textContent="Salida"; l.style.fontSize="8px"; div.appendChild(l); }
+    if(n===TOTAL_CELLS){ const l=document.createElement("span"); l.textContent="Meta"; l.style.fontSize="8px"; div.appendChild(l); }
+
+    const tokensDiv = document.createElement("div");
+    tokensDiv.className = "tokens";
+    tokensDiv.id = `tokens-${n}`;
+    div.appendChild(tokensDiv);
+
+    boardEl.appendChild(div);
+  }
+}
+
+function buildLegend(){
+  const legend = document.getElementById("legend");
+  legend.innerHTML = "";
+  QUESTION_BANK.categories.forEach(cat=>{
+    const span = document.createElement("span");
+    span.innerHTML = `<i style="background:${cat.color}"></i>${cat.name}`;
+    legend.appendChild(span);
+  });
+}
+
+function renderAll(){
+  renderTokens();
+  renderHud();
+}
+
+function renderTokens(){
+  document.querySelectorAll(".tokens").forEach(el=>el.innerHTML="");
+  players.forEach((p)=>{
+    const cellNum = Math.max(1, p.pos);
+    const container = document.getElementById(`tokens-${cellNum}`);
+    if(container){
+      const t = document.createElement("div");
+      t.className = "token";
+      t.style.background = p.color;
+      t.title = p.name;
+      container.appendChild(t);
+    }
+  });
+}
+
+function renderHud(){
+  const hud = document.getElementById("hud");
+  hud.innerHTML = "";
+  players.forEach((p, idx)=>{
+    const chip = document.createElement("div");
+    chip.className = "player-chip" + (idx===currentPlayerIdx ? " active":"");
+    chip.innerHTML = `
+      <div class="pname"><span class="swatch" style="width:12px;height:12px;background:${p.color}"></span>${p.name}</div>
+      <div class="ppos">Casilla ${p.pos || "Salida"}</div>
+      ${p.pending!==null ? '<span class="pending-tag">Debe responder</span>' : ""}
+    `;
+    hud.appendChild(chip);
+  });
+}
+
+function addLog(msg){
+  const log = document.getElementById("log");
+  const line = document.createElement("div");
+  line.textContent = msg;
+  log.prepend(line);
+}
+
+/* =========================================================================
+   TURNOS Y DADO
+   ========================================================================= */
+const rollBtn  = document.getElementById("rollBtn");
+const diceFace = document.getElementById("diceFace");
+
+rollBtn.addEventListener("click", handleTurnStart);
+
+function handleTurnStart(){
+  if(gameOver) return;
+  const player = players[currentPlayerIdx];
+
+  if(player.pending !== null){
+    const catIdx = player.pending;
+    player.pending = null;
+    renderHud();
+    askQuestion(catIdx, (correct)=>{
+      if(correct){
+        addLog(`${player.name} respondió bien la pregunta pendiente y puede tirar el dado.`);
+        renderHud();
+        rollBtn.disabled = false;
+      } else {
+        addLog(`${player.name} volvió a fallar. Pierde el turno.`);
+        nextTurn();
+      }
+    });
+    return;
+  }
+
+  rollDice();
+}
+
+function rollDice(){
+  rollBtn.disabled = true;
+  let ticks = 0;
+  const interval = setInterval(()=>{
+    diceFace.textContent = 1 + Math.floor(Math.random()*6);
+    ticks++;
+    if(ticks > 8){
+      clearInterval(interval);
+      const result = 1 + Math.floor(Math.random()*6);
+      diceFace.textContent = result;
+      movePlayer(result);
+    }
+  }, 60);
+}
+
+function movePlayer(steps){
+  const player = players[currentPlayerIdx];
+  let newPos = player.pos + steps;
+  if(newPos > TOTAL_CELLS){
+    newPos = TOTAL_CELLS - (newPos - TOTAL_CELLS);
+  }
+  player.pos = newPos;
+  renderTokens();
+  renderHud();
+  addLog(`${player.name} sacó ${steps} y avanza a la casilla ${player.pos}.`);
+
+  if(player.pos === TOTAL_CELLS){
+    endGame(player);
+    return;
+  }
+
+  if(cellCategoryMap[player.pos] !== undefined){
+    const catIdx = cellCategoryMap[player.pos];
+    askQuestion(catIdx, (correct)=>{
+      if(correct){
+        addLog(`${player.name} respondió correctamente y sigue en la casilla ${player.pos}.`);
+        nextTurn();
+      } else {
+        addLog(`${player.name} falló. Deberá responder de nuevo en su próximo turno antes de tirar el dado.`);
+        player.pending = catIdx;
+        renderHud();
+        nextTurn();
+      }
+    });
+  } else {
+    nextTurn();
+  }
+}
+
+function nextTurn(){
+  rollBtn.disabled = false;
+  currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
+  renderHud();
+}
+
+function endGame(winner){
+  gameOver = true;
+  rollBtn.disabled = true;
+  document.getElementById("winnerText").textContent = `🏆 ¡${winner.name} ganó la partida!`;
+  document.getElementById("winOverlay").style.display = "flex";
+}
+
+/* =========================================================================
+   MODAL DE PREGUNTAS
+   ========================================================================= */
+const overlay      = document.getElementById("overlay");
+const catTag       = document.getElementById("catTag");
+const questionText = document.getElementById("questionText");
+const optionsDiv   = document.getElementById("options");
+const feedback     = document.getElementById("feedback");
+const continueBtn  = document.getElementById("continueBtn");
+
+function askQuestion(catIdx, onDone){
+  const {data} = pickQuestion(catIdx);
+  const cat = QUESTION_BANK.categories[catIdx];
+  catTag.textContent = cat.name;
+  catTag.style.background = cat.color;
+  questionText.textContent = data.question;
+  optionsDiv.innerHTML = "";
+  feedback.textContent = "";
+  continueBtn.style.display = "none";
+
+  data.options.forEach((opt, i)=>{
+    const btn = document.createElement("button");
+    btn.className = "option-btn";
+    btn.textContent = opt;
+    btn.addEventListener("click", ()=>{
+      const isCorrect = i === data.correct;
+      Array.from(optionsDiv.children).forEach((b,bi)=>{
+        b.disabled = true;
+        if(bi === data.correct) b.classList.add("correct");
+        if(bi === i && !isCorrect) b.classList.add("wrong");
+      });
+      feedback.textContent = isCorrect ? "¡Correcto! ✅" : "Incorrecto ❌";
+      feedback.style.color = isCorrect ? "var(--right)" : "var(--wrong)";
+      continueBtn.style.display = "block";
+      continueBtn.onclick = ()=>{
+        overlay.style.display = "none";
+        onDone(isCorrect);
+      };
+    });
+    optionsDiv.appendChild(btn);
+  });
+
+  overlay.style.display = "flex";
+}
+</script>
+</body>
+</html>
